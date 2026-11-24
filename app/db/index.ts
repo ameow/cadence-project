@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import asyncHooks from "node:async_hooks";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 
@@ -40,8 +41,18 @@ function openDatabase(filename: string) {
 }
 
 let instance: ReturnType<typeof drizzle<typeof schema>> | undefined;
+type Db = NonNullable<typeof instance>;
+let databaseScope: asyncHooks.AsyncLocalStorage<Db> | undefined;
+
+/** Run an application request against an isolated database, including its access checks. */
+export function withDatabase<T>(database: Db, run: () => T): T {
+  databaseScope ??= new asyncHooks.AsyncLocalStorage<Db>();
+  return databaseScope.run(database, run);
+}
 
 function getDb() {
+  const scoped = databaseScope?.getStore();
+  if (scoped) return scoped;
   if (!instance) {
     instance = drizzle(getSqlite(), { schema });
   }
