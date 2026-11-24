@@ -68,7 +68,11 @@ export async function presentNotification(
         readAt: item.readAt,
         title: review
           ? `${actor?.name ?? "Someone"} submitted a Refund Request`
-          : "Refund Request received",
+          : item.kind === "refund_approved"
+            ? "Refund Request approved"
+            : item.kind === "refund_declined"
+              ? "Refund Request declined"
+              : "Refund Request received",
         context: `${target.course.title} · Purchase #${target.purchase.id}`,
         destination: `${review ? "/admin/refunds" : "/settings"}?refundRequestId=${target.refund.id}#refund-request-${target.refund.id}`,
       };

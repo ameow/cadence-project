@@ -721,6 +721,17 @@ export function approveRefundRequest(
       .where(eq(refunds.id, refundRequestId))
       .run();
 
+    insertNotifications(tx, [
+      {
+        recipientId: purchase.userId,
+        actorId: platformAdminId,
+        kind: "refund_approved",
+        eventKey: `refund:${refundRequestId}:approved`,
+        refundId: refundRequestId,
+        createdAt: now.toISOString(),
+      },
+    ]);
+
     return {
       ok: true,
       email: buildDecisionEmail(tx, purchase, RefundStatus.Approved, note),
@@ -763,6 +774,17 @@ export function declineRefundRequest(
       })
       .where(eq(refunds.id, refundRequestId))
       .run();
+
+    insertNotifications(tx, [
+      {
+        recipientId: found.purchase.userId,
+        actorId: platformAdminId,
+        kind: "refund_declined",
+        eventKey: `refund:${refundRequestId}:declined`,
+        refundId: refundRequestId,
+        createdAt: now.toISOString(),
+      },
+    ]);
 
     return {
       ok: true,
