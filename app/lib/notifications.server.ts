@@ -12,6 +12,7 @@ import {
   users,
 } from "~/db/schema";
 import { getCurrentUserId } from "~/lib/session";
+import { activeInbox } from "~/lib/notification-retention.server";
 import { getAccess } from "~/lib/access.server";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -128,7 +129,7 @@ export async function getInbox(request: Request, recipientId: number) {
   const rows = db
     .select()
     .from(notifications)
-    .where(eq(notifications.recipientId, recipientId))
+    .where(activeInbox(recipientId))
     .orderBy(desc(notifications.createdAt), desc(notifications.id))
     .all();
   return {
@@ -143,8 +144,6 @@ export function recipientNotification(id: number, recipientId: number) {
   return db
     .select()
     .from(notifications)
-    .where(
-      and(eq(notifications.id, id), eq(notifications.recipientId, recipientId))
-    )
+    .where(and(eq(notifications.id, id), activeInbox(recipientId)))
     .get();
 }

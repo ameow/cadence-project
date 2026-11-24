@@ -15,6 +15,7 @@
     "typecheck": "react-router typegen && tsc",
     "test": "vitest run",
     "test:watch": "vitest",
+    "notifications:purge": "tsx --tsconfig tsconfig.json scripts/purge-notifications.ts",
     "db:generate": "drizzle-kit generate",
     "db:seed": "tsx scripts/seed.ts",
     "db:migrate": "drizzle-kit migrate",
