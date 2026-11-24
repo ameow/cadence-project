@@ -11,7 +11,7 @@ import {
 import { insertNotifications } from "~/lib/notifications.server";
 import { MIN_COMMENT_LENGTH, MAX_COMMENT_LENGTH } from "~/lib/comments";
 
-/** The comment and any future inbox entries share this transaction boundary. */
+/** The comment and complete recipient set share this transaction boundary. */
 export function createComment(
   userId: number,
   lessonId: number,
@@ -38,8 +38,9 @@ export function createComment(
       .get();
     if (!course) throw new Error("Lesson not found");
 
+    let parent: typeof comments.$inferSelect | undefined;
     if (parentId !== null) {
-      const parent = tx
+      parent = tx
         .select()
         .from(comments)
         .where(eq(comments.id, parentId))
@@ -53,18 +54,21 @@ export function createComment(
       }
     }
 
+    const actor = tx.select().from(users).where(eq(users.id, userId)).get();
+    const isStudent =
+      actor?.role !== UserRole.Admin && course.instructorId !== userId;
     const comment = tx
       .insert(comments)
-      .values({ userId, lessonId, parentId, body: trimmed })
+      .values({
+        userId,
+        lessonId,
+        parentId,
+        body: trimmed,
+        studentStarted: parentId === null && isStudent,
+      })
       .returning()
       .get();
-    const actor = tx.select().from(users).where(eq(users.id, userId)).get();
-    if (
-      parentId === null &&
-      actor &&
-      actor.role !== UserRole.Admin &&
-      course.instructorId !== userId
-    ) {
+    if (parentId === null && isStudent) {
       insertNotifications(tx, [
         {
           recipientId: course.instructorId,
@@ -74,6 +78,23 @@ export function createComment(
           commentId: comment.id,
         },
       ]);
+    }
+    if (parent?.studentStarted) {
+      const recipients = isStudent
+        ? [parent.userId, course.instructorId]
+        : [parent.userId];
+      insertNotifications(
+        tx,
+        [...new Set(recipients)]
+          .filter((recipientId) => recipientId !== userId)
+          .map((recipientId) => ({
+            recipientId,
+            actorId: userId,
+            kind: "lesson-reply",
+            eventKey: `comment:${comment.id}`,
+            commentId: comment.id,
+          }))
+      );
     }
     return comment;
   });

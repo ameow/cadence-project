@@ -1896,7 +1896,28 @@ This course is still in draft while the cluster examples are rewritten against t
   // Only enrolled students comment.
 
   function comment(values: typeof schema.comments.$inferInsert) {
-    const [row] = db.insert(schema.comments).values(values).returning().all();
+    const context = db
+      .select({
+        role: schema.users.role,
+        instructorId: schema.courses.instructorId,
+      })
+      .from(schema.lessons)
+      .innerJoin(schema.modules, eq(schema.lessons.moduleId, schema.modules.id))
+      .innerJoin(schema.courses, eq(schema.modules.courseId, schema.courses.id))
+      .innerJoin(schema.users, eq(schema.users.id, values.userId))
+      .where(eq(schema.lessons.id, values.lessonId))
+      .get();
+    const [row] = db
+      .insert(schema.comments)
+      .values({
+        ...values,
+        studentStarted:
+          values.parentId == null &&
+          context?.role !== UserRole.Admin &&
+          context?.instructorId !== values.userId,
+      })
+      .returning()
+      .all();
     return row;
   }
 
