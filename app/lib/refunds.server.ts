@@ -25,6 +25,7 @@ import {
   LessonProgressStatus,
   RefundStatus,
   UserRole,
+  NotificationKind,
 } from "~/db/schema";
 import { insertNotifications } from "~/lib/notifications.server";
 import { formatPrice } from "~/lib/utils";
@@ -414,7 +415,7 @@ export function raiseRefundRequest(
         .map((admin) => ({
           recipientId: admin.id,
           actorId: buyerId,
-          kind: "refund_submitted",
+          kind: NotificationKind.RefundSubmitted,
           eventKey,
           refundId: refundRequest.id,
           createdAt: now.toISOString(),
@@ -422,7 +423,7 @@ export function raiseRefundRequest(
       {
         recipientId: buyerId,
         actorId: buyerId,
-        kind: "refund_receipt",
+        kind: NotificationKind.RefundReceipt,
         eventKey,
         refundId: refundRequest.id,
         createdAt: now.toISOString(),
@@ -725,7 +726,7 @@ export function approveRefundRequest(
       {
         recipientId: purchase.userId,
         actorId: platformAdminId,
-        kind: "refund_approved",
+        kind: NotificationKind.RefundApproved,
         eventKey: `refund:${refundRequestId}:approved`,
         refundId: refundRequestId,
         createdAt: now.toISOString(),
@@ -779,7 +780,7 @@ export function declineRefundRequest(
       {
         recipientId: found.purchase.userId,
         actorId: platformAdminId,
-        kind: "refund_declined",
+        kind: NotificationKind.RefundDeclined,
         eventKey: `refund:${refundRequestId}:declined`,
         refundId: refundRequestId,
         createdAt: now.toISOString(),

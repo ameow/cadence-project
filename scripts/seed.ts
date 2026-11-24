@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 import * as schema from "../app/db/schema";
 import {
   UserRole,
+  NotificationKind,
   CourseStatus,
   LessonProgressStatus,
   RefundStatus,
@@ -2885,7 +2886,7 @@ This course is still in draft while the cluster examples are rewritten against t
       .values({
         recipientId: course.instructorId,
         actorId: comment.userId,
-        kind: "lesson-question",
+        kind: NotificationKind.LessonQuestion,
         eventKey: `comment:${comment.id}`,
         commentId: comment.id,
         createdAt: comment.createdAt,
@@ -2912,7 +2913,7 @@ This course is still in draft while the cluster examples are rewritten against t
         {
           recipientId: buyerId,
           actorId: buyerId,
-          kind: "refund_receipt",
+          kind: NotificationKind.RefundReceipt,
           eventKey: `refund:${refund.id}:submitted`,
           refundId: refund.id,
           createdAt: refund.requestedAt,
@@ -2922,7 +2923,7 @@ This course is still in draft while the cluster examples are rewritten against t
           .map((admin) => ({
             recipientId: admin.id,
             actorId: buyerId,
-            kind: "refund_submitted",
+            kind: NotificationKind.RefundSubmitted,
             eventKey: `refund:${refund.id}:submitted`,
             refundId: refund.id,
             createdAt: refund.requestedAt,

@@ -7,6 +7,7 @@ import {
   modules,
   users,
   UserRole,
+  NotificationKind,
 } from "~/db/schema";
 import { insertNotifications } from "~/lib/notifications.server";
 import { MIN_COMMENT_LENGTH, MAX_COMMENT_LENGTH } from "~/lib/comments";
@@ -73,7 +74,7 @@ export function createComment(
         {
           recipientId: course.instructorId,
           actorId: userId,
-          kind: "lesson-question",
+          kind: NotificationKind.LessonQuestion,
           eventKey: `comment:${comment.id}`,
           commentId: comment.id,
         },
@@ -90,7 +91,7 @@ export function createComment(
           .map((recipientId) => ({
             recipientId,
             actorId: userId,
-            kind: "lesson-reply",
+            kind: NotificationKind.LessonReply,
             eventKey: `comment:${comment.id}`,
             commentId: comment.id,
           }))
