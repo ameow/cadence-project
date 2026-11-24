@@ -6,6 +6,7 @@ import {
 } from "@react-router/dev/routes";
 
 export default [
+  route("api/notifications", "routes/api.notifications.ts"),
   index("routes/home.tsx"),
   layout("routes/layout.app.tsx", [
     route("dashboard", "routes/dashboard.tsx"),

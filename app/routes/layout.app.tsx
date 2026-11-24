@@ -1,5 +1,6 @@
 import { Outlet } from "react-router";
 import type { Route } from "./+types/layout.app";
+import { NotificationBell } from "~/components/notification-bell";
 import { Sidebar } from "~/components/sidebar";
 import { DevUI } from "~/components/dev-ui";
 import { Toaster } from "sonner";
@@ -185,7 +186,11 @@ export async function loader({ request }: Route.LoaderArgs) {
           course.courseId
         );
         const totalLessons = getTotalLessonCount(course.courseId);
-        const progress = calculateProgress(currentUserId, course.courseId, false);
+        const progress = calculateProgress(
+          currentUserId,
+          course.courseId,
+          false
+        );
         return {
           courseId: course.courseId,
           title: course.courseTitle,
@@ -235,6 +240,11 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
         isTeamAdmin={userIsTeamAdmin}
       />
       <main className="flex-1 overflow-y-auto">
+        {currentUser && (
+          <header className="sticky top-0 z-40 flex h-16 items-center justify-end border-b bg-background px-6">
+            <NotificationBell key={currentUser.id} userId={currentUser.id} />
+          </header>
+        )}
         <Outlet />
       </main>
       <DevUI

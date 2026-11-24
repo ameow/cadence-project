@@ -100,7 +100,11 @@ function CommentForm({
       />
 
       <div className="flex items-center gap-3">
-        <Button type="submit" size="sm" disabled={submitting || empty || tooLong}>
+        <Button
+          type="submit"
+          size="sm"
+          disabled={submitting || empty || tooLong}
+        >
           {submitting ? "Posting..." : submitLabel}
         </Button>
 
@@ -206,7 +210,8 @@ function CommentItem({
   const [editing, setEditing] = useState(false);
   const [replying, setReplying] = useState(false);
 
-  const isAuthor = currentUserId !== null && comment.author.id === currentUserId;
+  const isAuthor =
+    currentUserId !== null && comment.author.id === currentUserId;
 
   if (comment.deleted) {
     return (
@@ -225,7 +230,14 @@ function CommentItem({
   }
 
   return (
-    <div className={cn("py-3", isReply && "border-l pl-4")}>
+    <div
+      id={`comment-${comment.id}`}
+      tabIndex={-1}
+      className={cn(
+        "scroll-mt-8 py-3 target:rounded-lg target:bg-primary/10",
+        isReply && "border-l pl-4"
+      )}
+    >
       <div className="flex items-start gap-3">
         <UserAvatar
           name={comment.author.name}

@@ -374,3 +374,36 @@ export const videoWatchEvents = sqliteTable("video_watch_events", {
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
 });
+
+// References only: presentation is resolved with current destination authorization.
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    recipientId: integer("recipient_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    actorId: integer("actor_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    kind: text("kind").notNull(),
+    eventKey: text("event_key").notNull(),
+    commentId: integer("comment_id").references(() => comments.id, {
+      onDelete: "set null",
+    }),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+    readAt: text("read_at"),
+  },
+  (table) => [
+    uniqueIndex("notifications_event_recipient_idx").on(
+      table.eventKey,
+      table.recipientId
+    ),
+    index("notifications_recipient_created_idx").on(
+      table.recipientId,
+      table.createdAt
+    ),
+  ]
+);

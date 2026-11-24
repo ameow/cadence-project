@@ -1,6 +1,14 @@
 import { eq } from "drizzle-orm";
 import { db } from "~/db";
-import { comments, courses, lessons, modules } from "~/db/schema";
+import {
+  comments,
+  courses,
+  lessons,
+  modules,
+  users,
+  UserRole,
+} from "~/db/schema";
+import { insertNotifications } from "~/lib/notifications.server";
 import { MIN_COMMENT_LENGTH, MAX_COMMENT_LENGTH } from "~/lib/comments";
 
 /** The comment and any future inbox entries share this transaction boundary. */
@@ -22,7 +30,7 @@ export function createComment(
     }
 
     const course = tx
-      .select({ id: courses.id })
+      .select({ id: courses.id, instructorId: courses.instructorId })
       .from(lessons)
       .innerJoin(modules, eq(lessons.moduleId, modules.id))
       .innerJoin(courses, eq(modules.courseId, courses.id))
@@ -45,10 +53,28 @@ export function createComment(
       }
     }
 
-    return tx
+    const comment = tx
       .insert(comments)
       .values({ userId, lessonId, parentId, body: trimmed })
       .returning()
       .get();
+    const actor = tx.select().from(users).where(eq(users.id, userId)).get();
+    if (
+      parentId === null &&
+      actor &&
+      actor.role !== UserRole.Admin &&
+      course.instructorId !== userId
+    ) {
+      insertNotifications(tx, [
+        {
+          recipientId: course.instructorId,
+          actorId: userId,
+          kind: "lesson-question",
+          eventKey: `comment:${comment.id}`,
+          commentId: comment.id,
+        },
+      ]);
+    }
+    return comment;
   });
 }
