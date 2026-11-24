@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Route } from "./+types/api.notifications";
 import { db } from "~/db";
 import { notifications, users } from "~/db/schema";
+import { activeInbox } from "~/lib/notification-retention.server";
 import { requireUserId } from "~/lib/access.server";
 import {
   getInbox,
@@ -38,7 +39,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (input.intent === "mark-all") {
     db.update(notifications)
       .set({ readAt: new Date().toISOString() })
-      .where(eq(notifications.recipientId, userId))
+      .where(activeInbox(userId))
       .run();
     return { ok: true, destination: null };
   }
@@ -48,13 +49,13 @@ export async function action({ request }: Route.ActionArgs) {
     input.intent === "open" ? await presentNotification(request, item) : null;
   if (input.intent === "open" && !presented?.destination)
     throw data("Notification unavailable", { status: 404 });
-  db.update(notifications)
+  const updated = db
+    .update(notifications)
     .set({
       readAt: input.intent === "unread" ? null : new Date().toISOString(),
     })
-    .where(
-      and(eq(notifications.id, item.id), eq(notifications.recipientId, userId))
-    )
+    .where(and(eq(notifications.id, item.id), activeInbox(userId)))
     .run();
+  if (!updated.changes) throw data("Notification unavailable", { status: 404 });
   return { ok: true, destination: presented?.destination ?? null };
 }
