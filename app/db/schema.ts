@@ -341,6 +341,10 @@ export const comments = sqliteTable(
     parentId: integer("parent_id").references(
       (): AnySQLiteColumn => comments.id
     ),
+    // Captured at thread creation; later role/ownership changes do not change origin.
+    studentStarted: integer("student_started", { mode: "boolean" })
+      .notNull()
+      .default(false),
     // Markdown, 1–5000 chars. Enforced on write, rendered by
     // renderComment (untrusted input — never renderMarkdown).
     body: text("body").notNull(),

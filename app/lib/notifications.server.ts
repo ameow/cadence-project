@@ -66,7 +66,7 @@ export async function presentNotification(
     id: item.id,
     createdAt: item.createdAt,
     readAt: item.readAt,
-    title: `${actor?.name ?? "Someone"} asked a question`,
+    title: `${actor?.name ?? "Someone"} ${item.kind === "lesson-reply" ? "replied to a question" : "asked a question"}`,
     context: `${target.course.title} · ${target.lesson.title}`,
     destination: `/courses/${target.course.slug}/lessons/${target.lesson.id}#comment-${target.comment.id}`,
   };
