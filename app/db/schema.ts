@@ -392,6 +392,9 @@ export const notifications = sqliteTable(
     }),
     kind: text("kind").notNull(),
     eventKey: text("event_key").notNull(),
+    refundId: integer("refund_id").references(() => refunds.id, {
+      onDelete: "set null",
+    }),
     commentId: integer("comment_id").references(() => comments.id, {
       onDelete: "set null",
     }),

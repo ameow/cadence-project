@@ -219,7 +219,7 @@ export function NotificationBell({ userId }: { userId: number }) {
                             disabled={busy}
                             onClick={() => void mutate("open", item.id)}
                           >
-                            Open question
+                            Open notification
                           </button>
                         )}
                         <button

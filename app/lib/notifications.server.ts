@@ -6,8 +6,12 @@ import {
   lessons,
   modules,
   notifications,
+  refunds,
+  purchases,
+  UserRole,
   users,
 } from "~/db/schema";
+import { getCurrentUserId } from "~/lib/session";
 import { activeInbox } from "~/lib/notification-retention.server";
 import { getAccess } from "~/lib/access.server";
 
@@ -30,6 +34,54 @@ export async function presentNotification(
   request: Request,
   item: typeof notifications.$inferSelect
 ) {
+  if (item.kind.startsWith("refund_")) {
+    const userId = await getCurrentUserId(request);
+    const user = userId
+      ? db.select().from(users).where(eq(users.id, userId)).get()
+      : undefined;
+    const target =
+      item.refundId === null
+        ? undefined
+        : db
+            .select({ refund: refunds, purchase: purchases, course: courses })
+            .from(refunds)
+            .innerJoin(purchases, eq(refunds.purchaseId, purchases.id))
+            .innerJoin(courses, eq(purchases.courseId, courses.id))
+            .where(eq(refunds.id, item.refundId))
+            .get();
+    const review = item.kind === "refund_submitted";
+    if (
+      target &&
+      user &&
+      user.id === item.recipientId &&
+      (review
+        ? user.role === UserRole.Admin
+        : target.purchase.userId === user.id)
+    ) {
+      const actor =
+        item.actorId === null
+          ? undefined
+          : db.select().from(users).where(eq(users.id, item.actorId)).get();
+      return {
+        id: item.id,
+        createdAt: item.createdAt,
+        readAt: item.readAt,
+        title: review
+          ? `${actor?.name ?? "Someone"} submitted a Refund Request`
+          : "Refund Request received",
+        context: `${target.course.title} · Purchase #${target.purchase.id}`,
+        destination: `${review ? "/admin/refunds" : "/settings"}?refundRequestId=${target.refund.id}#refund-request-${target.refund.id}`,
+      };
+    }
+    return {
+      id: item.id,
+      createdAt: item.createdAt,
+      readAt: item.readAt,
+      title: "Notification unavailable",
+      context: null,
+      destination: null,
+    };
+  }
   const target =
     item.commentId === null
       ? undefined

@@ -2892,6 +2892,44 @@ This course is still in draft while the cluster examples are rewritten against t
       })
       .run();
   }
+  // Refund Request entries keep only references; context is authorized at read time.
+  const refundNotifications = db
+    .select({ refund: schema.refunds, buyerId: schema.purchases.userId })
+    .from(schema.refunds)
+    .innerJoin(
+      schema.purchases,
+      eq(schema.refunds.purchaseId, schema.purchases.id)
+    )
+    .all();
+  const platformAdmins = db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.role, UserRole.Admin))
+    .all();
+  for (const { refund, buyerId } of refundNotifications) {
+    db.insert(schema.notifications)
+      .values([
+        {
+          recipientId: buyerId,
+          actorId: buyerId,
+          kind: "refund_receipt",
+          eventKey: `refund:${refund.id}:submitted`,
+          refundId: refund.id,
+          createdAt: refund.requestedAt,
+        },
+        ...platformAdmins
+          .filter((admin) => admin.id !== buyerId)
+          .map((admin) => ({
+            recipientId: admin.id,
+            actorId: buyerId,
+            kind: "refund_submitted",
+            eventKey: `refund:${refund.id}:submitted`,
+            refundId: refund.id,
+            createdAt: refund.requestedAt,
+          })),
+      ])
+      .run();
+  }
   console.log(`Created ${countRows(schema.notifications)} notifications.`);
 
   // ─── Summary ───

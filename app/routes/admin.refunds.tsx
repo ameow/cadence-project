@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { Route } from "./+types/admin.refunds";
 import { getCurrentUserId } from "~/lib/session";
 import { parseFormData } from "~/lib/validation";
-import { RefundStatus, UserRole, users } from "~/db/schema";
+import { RefundStatus, UserRole, users, refunds } from "~/db/schema";
 import { db } from "~/db";
 import { eq } from "drizzle-orm";
 import { Card, CardContent } from "~/components/ui/card";
@@ -23,9 +23,7 @@ import {
 import { RULE_BREAK_LABELS } from "~/lib/refund-rules";
 import { sendEmail } from "~/lib/mailer.server";
 
-const refundFilterSchema = z
-  .nativeEnum(RefundStatus)
-  .catch(RefundStatus.Open);
+const refundFilterSchema = z.nativeEnum(RefundStatus).catch(RefundStatus.Open);
 
 const adminRefundActionSchema = z.discriminatedUnion("intent", [
   z.object({
@@ -80,13 +78,34 @@ export function meta() {
   ];
 }
 
-export async function loader({ request, url }: Route.LoaderArgs) {
+export async function loader({ request }: Route.LoaderArgs) {
   await requirePlatformAdmin(request);
 
-  const status = refundFilterSchema.parse(url.searchParams.get("status"));
+  const search = new URL(request.url).searchParams;
+  const parsedTarget = z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .safeParse(search.get("refundRequestId") ?? undefined);
+  if (!parsedTarget.success)
+    throw data("Refund Request unavailable", { status: 404 });
+  const selected =
+    parsedTarget.data === undefined
+      ? undefined
+      : db
+          .select()
+          .from(refunds)
+          .where(eq(refunds.id, parsedTarget.data))
+          .get();
+  if (parsedTarget.data !== undefined && !selected)
+    throw data("Refund Request unavailable", { status: 404 });
+  const status =
+    selected?.status ?? refundFilterSchema.parse(search.get("status"));
 
   return {
     status,
+    selectedRefundRequestId: selected?.id ?? null,
     refundRequests: listRefundRequestsForReview(db, status, new Date()),
   };
 }
@@ -198,6 +217,7 @@ export default function AdminRefunds({ loaderData }: Route.ComponentProps) {
           {refundRequests.map((refundRequest) => (
             <RefundRequestCard
               key={refundRequest.id}
+              selected={loaderData.selectedRefundRequestId === refundRequest.id}
               refundRequest={refundRequest}
             />
           ))}
@@ -211,11 +231,7 @@ function formatHours(seconds: number) {
   return `${(seconds / 3600).toFixed(1)}h`;
 }
 
-function Figures({
-  refundRequest,
-}: {
-  refundRequest: RefundRequestForReview;
-}) {
+function Figures({ refundRequest }: { refundRequest: RefundRequestForReview }) {
   const { figures } = refundRequest;
 
   const items =
@@ -261,8 +277,10 @@ function Figures({
 
 function RefundRequestCard({
   refundRequest,
+  selected,
 }: {
   refundRequest: RefundRequestForReview;
+  selected: boolean;
 }) {
   const fetcher = useFetcher<
     { success: true; message: string } | { error: string }
@@ -288,7 +306,10 @@ function RefundRequestCard({
   }
 
   return (
-    <Card>
+    <Card
+      id={`refund-request-${refundRequest.id}`}
+      className={`scroll-mt-8 ${selected ? "ring-2 ring-primary" : ""}`}
+    >
       <CardContent className="space-y-4 p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
