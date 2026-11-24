@@ -6,6 +6,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "~/components/ui/card"
 import { CourseStatus } from "~/db/schema";
 import { BookOpen, GraduationCap, Users, ArrowRight, User, Moon, Sun } from "lucide-react";
 import { CourseImage } from "~/components/course-image";
+import { NotificationBell } from "~/components/notification-bell";
 import { DevUI } from "~/components/dev-ui";
 import { getCurrentUserId, getDevCountry } from "~/lib/session";
 import { getCountryTierInfo, COUNTRIES } from "~/lib/ppp";
@@ -163,6 +164,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             Cadence
           </Link>
           <nav className="flex items-center gap-6">
+            {currentUser && <NotificationBell key={currentUser.id} userId={currentUser.id} />}
             <Link
               to="/courses"
               className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
