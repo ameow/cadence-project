@@ -37,6 +37,15 @@ export enum RefundStatus {
   Declined = "declined",
 }
 
+export enum NotificationKind {
+  LessonQuestion = "lesson-question",
+  LessonReply = "lesson-reply",
+  RefundSubmitted = "refund_submitted",
+  RefundReceipt = "refund_receipt",
+  RefundApproved = "refund_approved",
+  RefundDeclined = "refund_declined",
+}
+
 export enum TeamMemberRole {
   Admin = "admin",
   Member = "member",
@@ -390,7 +399,7 @@ export const notifications = sqliteTable(
     actorId: integer("actor_id").references(() => users.id, {
       onDelete: "set null",
     }),
-    kind: text("kind").notNull(),
+    kind: text("kind").notNull().$type<NotificationKind>(),
     eventKey: text("event_key").notNull(),
     refundId: integer("refund_id").references(() => refunds.id, {
       onDelete: "set null",

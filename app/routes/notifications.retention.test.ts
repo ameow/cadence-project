@@ -22,13 +22,55 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function entry(kind: string, createdAt = "2026-08-26T12:00:00.000Z") {
+function entry(
+  kind: schema.NotificationKind,
+  createdAt = "2026-08-26T12:00:00.000Z"
+) {
+  const isRefund =
+    kind !== schema.NotificationKind.LessonQuestion &&
+    kind !== schema.NotificationKind.LessonReply;
+  let refundId: number | undefined;
+  if (isRefund) {
+    if (kind === schema.NotificationKind.RefundSubmitted) {
+      db.update(schema.users)
+        .set({ role: schema.UserRole.Admin })
+        .where(eq(schema.users.id, base.user.id))
+        .run();
+    }
+    const purchase = db
+      .insert(schema.purchases)
+      .values({
+        userId:
+          kind === schema.NotificationKind.RefundSubmitted
+            ? base.instructor.id
+            : base.user.id,
+        courseId: base.course.id,
+        amountPaid: 5000,
+      })
+      .returning()
+      .get();
+    refundId = db
+      .insert(schema.refunds)
+      .values({
+        purchaseId: purchase.id,
+        reason: "Not for me",
+        status:
+          kind === schema.NotificationKind.RefundApproved
+            ? schema.RefundStatus.Approved
+            : kind === schema.NotificationKind.RefundDeclined
+              ? schema.RefundStatus.Declined
+              : schema.RefundStatus.Open,
+      })
+      .returning()
+      .get().id;
+  }
   return db
     .insert(schema.notifications)
     .values({
       recipientId: base.user.id,
       eventKey: `${kind}:${createdAt}`,
       kind,
+      refundId,
       createdAt,
     })
     .returning()
@@ -73,12 +115,12 @@ async function mutate(intent: string, id?: number) {
 }
 
 it.each([
-  "lesson-question",
-  "lesson-reply",
-  "refund-request",
-  "refund-receipt",
-  "refund-approved",
-  "refund-declined",
+  schema.NotificationKind.LessonQuestion,
+  schema.NotificationKind.LessonReply,
+  schema.NotificationKind.RefundSubmitted,
+  schema.NotificationKind.RefundReceipt,
+  schema.NotificationKind.RefundApproved,
+  schema.NotificationKind.RefundDeclined,
 ])("expires %s at exactly 90 days before physical deletion", async (kind) => {
   const expired = entry(kind);
   const younger = entry(kind, "2026-08-26T12:00:00.001Z");
@@ -95,12 +137,24 @@ it.each([
     result.items.filter((item) => item.readAt === null).map((item) => item.id)
   ).toEqual([younger.id]);
   expect(result.unreadCount).toBe(1);
+  if (younger.refundId !== null) {
+    const path =
+      kind === schema.NotificationKind.RefundSubmitted
+        ? "/admin/refunds"
+        : "/settings";
+    expect(result.items[0]?.destination).toBe(
+      `${path}?refundRequestId=${younger.refundId}#refund-request-${younger.refundId}`
+    );
+  }
   expect(db.select().from(schema.notifications).all()).toHaveLength(2);
 });
 
 it("rejects every individual mutation for expired entries and leaves them untouched by mark-all", async () => {
-  const expired = entry("lesson-question");
-  const younger = entry("lesson-question", "2026-08-26T12:00:00.001Z");
+  const expired = entry(schema.NotificationKind.LessonQuestion);
+  const younger = entry(
+    schema.NotificationKind.LessonQuestion,
+    "2026-08-26T12:00:00.001Z"
+  );
   for (const intent of ["read", "unread", "open"]) {
     await expect(mutate(intent, expired.id)).rejects.toMatchObject({
       init: { status: 404 },
@@ -122,15 +176,18 @@ it("rejects every individual mutation for expired entries and leaves them untouc
 
 it("purges every expired kind, preserves younger rows and is repeatable", async () => {
   for (const kind of [
-    "lesson-question",
-    "lesson-reply",
-    "refund-request",
-    "refund-receipt",
-    "refund-approved",
-    "refund-declined",
+    schema.NotificationKind.LessonQuestion,
+    schema.NotificationKind.LessonReply,
+    schema.NotificationKind.RefundSubmitted,
+    schema.NotificationKind.RefundReceipt,
+    schema.NotificationKind.RefundApproved,
+    schema.NotificationKind.RefundDeclined,
   ])
     entry(kind);
-  const younger = entry("lesson-question", "2026-08-26T12:00:00.001Z");
+  const younger = entry(
+    schema.NotificationKind.LessonQuestion,
+    "2026-08-26T12:00:00.001Z"
+  );
   expect(withDatabase(db, () => purgeExpiredNotifications())).toBe(6);
   expect(db.select().from(schema.notifications).all()).toMatchObject([
     { id: younger.id },
@@ -140,13 +197,13 @@ it("purges every expired kind, preserves younger rows and is repeatable", async 
 });
 
 it("removes an account's inbox through the recipient cascade without deleting another account's history", async () => {
-  entry("lesson-question");
+  entry(schema.NotificationKind.LessonQuestion);
   const other = db
     .insert(schema.notifications)
     .values({
       recipientId: base.instructor.id,
       actorId: base.user.id,
-      kind: "lesson-question",
+      kind: schema.NotificationKind.LessonQuestion,
       eventKey: "other-account",
     })
     .returning()

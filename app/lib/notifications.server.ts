@@ -9,6 +9,7 @@ import {
   refunds,
   purchases,
   UserRole,
+  NotificationKind,
   users,
 } from "~/db/schema";
 import { getCurrentUserId } from "~/lib/session";
@@ -34,7 +35,12 @@ export async function presentNotification(
   request: Request,
   item: typeof notifications.$inferSelect
 ) {
-  if (item.kind.startsWith("refund_")) {
+  if (
+    item.kind === NotificationKind.RefundSubmitted ||
+    item.kind === NotificationKind.RefundReceipt ||
+    item.kind === NotificationKind.RefundApproved ||
+    item.kind === NotificationKind.RefundDeclined
+  ) {
     const userId = await getCurrentUserId(request);
     const user = userId
       ? db.select().from(users).where(eq(users.id, userId)).get()
@@ -49,7 +55,7 @@ export async function presentNotification(
             .innerJoin(courses, eq(purchases.courseId, courses.id))
             .where(eq(refunds.id, item.refundId))
             .get();
-    const review = item.kind === "refund_submitted";
+    const review = item.kind === NotificationKind.RefundSubmitted;
     if (
       target &&
       user &&
@@ -68,9 +74,9 @@ export async function presentNotification(
         readAt: item.readAt,
         title: review
           ? `${actor?.name ?? "Someone"} submitted a Refund Request`
-          : item.kind === "refund_approved"
+          : item.kind === NotificationKind.RefundApproved
             ? "Refund Request approved"
-            : item.kind === "refund_declined"
+            : item.kind === NotificationKind.RefundDeclined
               ? "Refund Request declined"
               : "Refund Request received",
         context: `${target.course.title} · Purchase #${target.purchase.id}`,
@@ -123,7 +129,7 @@ export async function presentNotification(
     id: item.id,
     createdAt: item.createdAt,
     readAt: item.readAt,
-    title: `${actor?.name ?? "Someone"} ${item.kind === "lesson-reply" ? "replied to a question" : "asked a question"}`,
+    title: `${actor?.name ?? "Someone"} ${item.kind === NotificationKind.LessonReply ? "replied to a question" : "asked a question"}`,
     context: `${target.course.title} · ${target.lesson.title}`,
     destination: `/courses/${target.course.slug}/lessons/${target.lesson.id}#comment-${target.comment.id}`,
   };
